@@ -18,11 +18,22 @@ const DataCache = {
     _cacheTTL: 5 * 60 * 1000, // 5 minutes default TTL
 
     // Get cache key based on filters
+    // Phai gom MOI filter anh huong toi ket qua: truoc day key chi co
+    // league_id va phase nen doi gw range hay max_entries van tra ve du lieu cu.
     getCacheKey(dataType, filters = null) {
         if (!filters) {
             filters = typeof getCurrentFilters === 'function' ? getCurrentFilters() : {};
         }
-        return `${dataType}_${filters.league_id}_${filters.phase}`;
+        const parts = [
+            dataType,
+            filters.league_id,
+            filters.phase,
+            filters.gw_start,
+            filters.gw_end,
+            filters.max_entries,
+            filters.month_mapping,
+        ];
+        return parts.join('_');
     },
 
     // Check if cache is valid
@@ -248,13 +259,18 @@ async function handleFiltersSubmit(e) {
     savePreferences();
 
     try {
-        showLoading('Clearing cache and reloading data...');
+        showLoading('Applying filters...');
 
-        // Clear client-side cache
+        // Chi don cache phia trinh duyet.
+        //
+        // Cache server KHONG bi xoa: cache key cua no da gom
+        // league_id/phase/gw_range/max_entries nen doi filter tu khac la cache
+        // miss. Xoa sach se vut luon ca du lieu bat bien (picks va diem cua GW
+        // da chot, bootstrap-static) von khong he phu thuoc filter, khien lan
+        // load sau phai crawl lai tu dau.
+        //
+        // Muon ep lay du lieu moi ngay thi dung nut Clear Cache.
         DataCache.clear();
-
-        // Clear server-side cache
-        await fetch('/api/cache/clear', { method: 'POST' });
 
         // Re-fetch current GW
         await fetchCurrentGW();
@@ -264,7 +280,7 @@ async function handleFiltersSubmit(e) {
             reloadPageData(filters);
         }
 
-        showToast('Cache cleared and data reloaded!', 'success');
+        showToast('Filters applied', 'success');
     } catch (error) {
         console.error('Error applying filters:', error);
         showToast('Error reloading data', 'error');

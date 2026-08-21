@@ -2,6 +2,9 @@ Flask>=3.0.0
 Flask-Caching>=2.1.0
 Flask-CORS>=4.0.0
 pandas>=2.0.0
-requests>=2.31.0
 numpy>=1.24.0
+requests>=2.31.0
 python-dotenv>=1.0.0
+
+# Dev / test
+pytest>=8.0.0

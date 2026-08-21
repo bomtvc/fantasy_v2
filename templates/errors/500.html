@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>500 — Lỗi máy chủ</h2>
+    </div>
+    <div class="card-body">
+        <p>Đã có lỗi xảy ra khi xử lý yêu cầu. Chi tiết đã được ghi vào log.</p>
+        <p><a href="{{ url_for('main.index') }}">← Quay lại Dashboard</a></p>
+    </div>
+</div>
+{% endblock %}

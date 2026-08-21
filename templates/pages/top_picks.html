@@ -1,21 +1,70 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="placeholder-page">
-    <div class="card">
-        <div class="card-header">
-            <h2>{{ page_title }}</h2>
-        </div>
-        <div class="card-body">
-            <p>This page is coming soon in the next development phase.</p>
-            <p>Current features available:</p>
-            <ul>
-                <li>✅ Dashboard</li>
-                <li>✅ League Members</li>
-                <li>✅ GW Points</li>
-                <li>✅ Month Points</li>
-            </ul>
-        </div>
-    </div>
+<div class="top-picks-page">
+    <div id="top-picks-table"></div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Top Picks Page Logic
+    let topPicksTable;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        topPicksTable = new DataTable('top-picks-table', {
+            searchable: true,
+            sortable: true,
+            paginated: true,
+            exportable: true,
+            pageSize: 25,
+            columnOrder: ['Rank', 'Player', 'Position', 'Times_Picked', 'Percent_Of_Entries', 'Total_Points'],
+            compactControls: true
+        });
+
+        const leagueId = document.getElementById('league-id').value;
+        if (leagueId) {
+            loadTopPicks();
+        }
+    });
+
+    // Override reloadPageData from main.js (force refresh when filters change)
+    window.reloadPageData = function (filters) {
+        DataCache.clear('top_picks');
+        loadTopPicks(true);
+    };
+
+    async function loadTopPicks(forceRefresh = false) {
+        const filters = getCurrentFilters();
+
+        const validation = validateFilters(filters);
+        if (!validation.valid) {
+            validation.errors.forEach(error => showToast(error, 'error'));
+            return;
+        }
+
+        try {
+            showLoading('Loading top picks...');
+
+            const queryString = buildQueryString(filters);
+            const data = await cachedFetch('top_picks', `/api/top-picks?${queryString}`, forceRefresh);
+
+            if (data.success) {
+                topPicksTable.setData(data.data);
+                if (!data.data.length) {
+                    showToast('Chưa có gameweek nào diễn ra', 'info');
+                } else {
+                    showToast('Top picks loaded successfully', 'success');
+                }
+            } else {
+                showToast(data.error || 'Failed to load data', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading top picks:', error);
+            showToast('Error loading data', 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+</script>
 {% endblock %}

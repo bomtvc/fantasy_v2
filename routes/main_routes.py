@@ -3,7 +3,7 @@ Main Routes
 Page rendering routes
 """
 
-from flask import render_template, request, session
+from flask import render_template
 from . import main_bp
 import config
 

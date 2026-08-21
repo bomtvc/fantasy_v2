@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>404 — Không tìm thấy trang</h2>
+    </div>
+    <div class="card-body">
+        <p>Đường dẫn bạn truy cập không tồn tại.</p>
+        <p><a href="{{ url_for('main.index') }}">← Quay lại Dashboard</a></p>
+    </div>
+</div>
+{% endblock %}

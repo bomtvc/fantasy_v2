@@ -4,48 +4,108 @@ Modern web application for analyzing Fantasy Premier League leagues with beautif
 
 ## Features
 
-- 📊 **League Analysis** - View all league members and their stats
-- 📈 **GW Points** - Track gameweek performance
-- 📅 **Month Points** - Monthly aggregated statistics
-- 🏆 **Rankings** - Weekly and monthly rankings
-- 🏅 **Awards** - Manager achievements and milestones
-- 🎯 **Chip History** - Track chip usage across gameweeks
-- 🎉 **Fun Stats** - Captain and bench analysis
-- 🔄 **Transfer History** - Complete transfer tracking
+- 📊 **Dashboard** - Tổng quan league
+- 👥 **League Members** - Danh sách thành viên kèm thống kê giải thưởng
+- 📈 **GW Points** - Điểm theo từng gameweek
+- 📅 **Month Points** - Tổng hợp theo tháng
+- 🏆 **Rankings** - Xếp hạng tuần / tháng
+- 🏅 **Awards** - Giải thưởng và tiền thưởng
+- ⭐ **Top Picks** - Cầu thủ được chọn nhiều nhất
+- 🎯 **Chip History** - Lịch sử dùng chip
+- 🎉 **Fun Stats** - Captain, ghế dự bị, transfer hay/dở nhất
+- 🔄 **Transfer History** - Toàn bộ chuyển nhượng
 
 ## Tech Stack
 
-- **Backend**: Flask 3.0+
+- **Backend**: Flask 3.0+ (application factory + blueprints)
 - **Frontend**: Vanilla JS + Modern CSS (Glassmorphism)
-- **Charts**: Chart.js
 - **Data**: Pandas, FPL Public API
+- **Cache**: Flask-Caching (FileSystemCache, chia sẻ giữa các gunicorn worker)
 
 ## Installation
 
-1. **Clone and navigate to project**:
-```bash
-cd "d:\Code\New folder\fantasy"
-```
-
-2. **Install dependencies**:
 ```bash
 pip install -r flask_requirements.txt
+cp .env.example .env      # rồi điền SECRET_KEY
 ```
-
-3. **Create environment file**:
-```bash
-copy .env.example .env
-```
-
-4. **Edit `.env` with your settings** (optional - defaults are provided)
 
 ## Running the App
 
 ```bash
-python flask_app.py
+python flask_app.py                                  # dev
+gunicorn --workers 2 --bind 0.0.0.0:5000 "flask_app:create_app()"   # production
 ```
 
-The app will be available at: `http://localhost:5000`
+Mặc định: <http://127.0.0.1:5000>
+
+## Configuration
+
+Toàn bộ cấu hình nằm trong `config.py` và **có thể override bằng biến môi
+trường hoặc file `.env`** (nạp tự động qua `python-dotenv`). Xem `.env.example`
+để biết danh sách đầy đủ.
+
+Các biến quan trọng:
+
+| Biến | Mặc định | Ghi chú |
+|---|---|---|
+| `SECRET_KEY` | *(sinh ngẫu nhiên)* | **Bắt buộc đặt trước khi deploy** |
+| `FLASK_DEBUG` | `False` | Không bật ở production |
+| `HOST` / `PORT` | `127.0.0.1` / `5000` | |
+| `CORS_ORIGINS` | *(trống)* | Trống = tắt CORS. Giao diện cùng origin nên không cần |
+| `ADMIN_TOKEN` | *(trống)* | Header `X-Admin-Token` cho `/api/cache/*` khi gọi từ script |
+| `MAX_WORKERS` | `6` | Số thread gọi FPL API song song |
+| `CACHE_DIR` | `<project>/cache` | Đường dẫn tuyệt đối, không phụ thuộc CWD |
+
+### Chiến lược cache
+
+| Loại dữ liệu | TTL | Lý do |
+|---|---|---|
+| `bootstrap-static` | 1 giờ | Chứa `events[].finished` - phải cập nhật sớm |
+| League standings | 1 giờ | Thay đổi chậm |
+| Entry history / transfers | 15 phút | Cập nhật trong lúc GW diễn ra |
+| Picks & điểm live của **GW đã chốt** | 7 ngày | Dữ liệu bất biến |
+
+## API Endpoints
+
+| Endpoint | Mô tả |
+|---|---|
+| `GET /api/health` | Liveness probe |
+| `GET /api/current-gw` | `current_gw` + `last_finished_gw` |
+| `GET /api/league/<id>` | Thông tin league, leader, best GW |
+| `GET /api/league/<id>/entries` | Thành viên + thống kê giải |
+| `GET /api/gw-points` | Bảng điểm theo GW |
+| `GET /api/month-points` | Bảng điểm theo tháng |
+| `GET /api/chip-history` | Lịch sử chip |
+| `GET /api/weekly-ranking` | Xếp hạng một GW |
+| `GET /api/monthly-ranking` | Xếp hạng một tháng |
+| `GET /api/awards-summary` | Người thắng tuần/tháng |
+| `GET /api/awards-leaderboard` | Bảng tổng giải thưởng |
+| `GET /api/top-picks` | Cầu thủ được chọn nhiều nhất |
+| `GET /api/fun-stats` | Captain / bench / transfer hay dở |
+| `GET /api/transfer-history` | Lịch sử chuyển nhượng |
+| `POST /api/export/csv` | Xuất CSV |
+| `POST /api/cache/clear` | Xoá cache *(same-origin hoặc `X-Admin-Token`)* |
+| `GET /api/cache/stats` | Thống kê cache *(same-origin hoặc `X-Admin-Token`)* |
+
+Tham số dùng chung: `league_id` (bắt buộc), `phase`, `gw_start`, `gw_end`,
+`max_entries`, `month_mapping`.
+
+## Ghi chú về FPL API
+
+- **`event/{gw}/live/`** trả điểm của toàn bộ cầu thủ trong 1 request - app dùng
+  endpoint này thay vì gọi `element-summary/{id}/` cho từng cầu thủ.
+- **`entry/{id}/history/`** đã chứa khoá `chips` đầy đủ, nên không cần gọi
+  `picks` từng GW để dò chip.
+- **`leagues-classic/{id}/standings/`**: trước khi GW đầu tiên kết thúc, toàn bộ
+  thành viên nằm ở `new_entries` chứ không phải `standings`. App gộp cả hai.
+- Một GW được coi là đã chốt khi `events[].finished` **và** `data_checked` cùng
+  bằng `true` (điểm bonus đã tính xong).
+
+## Tests
+
+```bash
+pytest
+```
 
 ## Project Structure
 
@@ -53,118 +113,18 @@ The app will be available at: `http://localhost:5000`
 fantasy/
 ├── flask_app.py           # Application factory
 ├── extensions.py          # Flask extensions
-├── config.py              # Configuration
+├── config.py              # Configuration (env-aware)
 ├── routes/
-│   ├── __init__.py       # Blueprint registration
-│   ├── main_routes.py    # Page routes
-│   └── api_routes.py     # API endpoints
+│   ├── __init__.py        # Blueprint registration
+│   ├── main_routes.py     # Page routes
+│   └── api_routes.py      # API endpoints
 ├── services/
-│   ├── __init__.py
-│   ├── fpl_api.py        # FPL API wrapper
-│   └── data_processor.py # Calculation logic
+│   ├── fpl_api.py         # FPL API client (session, retry, cache)
+│   └── data_processor.py  # Business logic (thuần, dễ test)
 ├── templates/
-│   ├── base.html         # Base template
-│   ├── components/       # Reusable components
-│   └── pages/            # Page templates
-└── static/
-    ├── css/              # Stylesheets
-    └── js/               # JavaScript modules
+│   ├── components/        # navbar, sidebar, loading
+│   ├── errors/            # 404, 500
+│   └── pages/             # Từng trang
+├── static/                # css, js, images
+└── tests/                 # pytest
 ```
-
-## API Endpoints
-
-### Data Endpoints
-- `GET /api/league/<league_id>` - League information
-- `GET /api/league/<league_id>/entries` - All league members
-- `GET /api/gw-points` - Gameweek points table
-- `GET /api/month-points` - Monthly points aggregation
-- `GET /api/chip-history` - Chip usage history
-
-### Utility Endpoints
-- `POST /api/export/csv` - Export data to CSV
-- `POST /api/cache/clear` - Clear application cache
-- `GET /api/cache/stats` - Get cache statistics
-
-## Configuration
-
-Key settings in `config.py`:
-- `REQUEST_TIMEOUT`: API request timeout (default: 10s)
-- `MAX_RETRIES`: Max API retry attempts (default: 3)
-- `MAX_WORKERS`: Concurrent API workers (default: 5)
-- `DEFAULT_LEAGUE_ID`: Default league to load (default: 314)
-
-### Caching Configuration
-
-The application uses **disk-based persistent caching** via Flask-Caching with FileSystemCache for optimal performance:
-
-**Cache Settings:**
-- `CACHE_TYPE`: `'FileSystemCache'` - Persistent  disk-based caching
-- `CACHE_DIR`: `'./cache'` - Cache directory location
-- `CACHE_THRESHOLD`: `500` - Maximum number of cached items
-- `CACHE_DEFAULT_TIMEOUT`: `900` (15 minutes) - Default cache expiration
-
-**TTL (Time-To-Live) Strategy:**
-- `BOOTSTRAP_CACHE_TTL`: `86400` (24 hours) - Static player/team data
-- `LEAGUE_CACHE_TTL`: `3600` (1 hour) - Semi-static league standings
-- `GW_DATA_CACHE_TTL`: `900` (15 minutes) - Dynamic gameweek data
-- `API_CACHE_TTL`: `300` (5 minutes) - General API responses
-
-**Benefits:**
-- ✅ Cache persists across application restarts
-- ✅ Reduces FPL API calls by ~80-90%
-- ✅ Dramatically improves load times (5-10x faster)
-- ✅ Intelligent TTL based on data volatility
-
-### Cache Management Endpoints
-
-- `POST /api/cache/clear` - Clear all cached data
-  ```json
-  // Optional: Request body for selective clearing (currently clears all)
-  {"prefix": "bootstrap"}
-  ```
-
-- `GET /api/cache/stats` - Get cache statistics
-  ```json
-  {
-    "success": true,
-    "stats": {
-      "cache_type": "FileSystemCache",
-      "cache_dir": "./cache",
-      "total_files": 42,
-      "total_size": 1234567,
-      "total_size_human": "1.18 MB",
-      "cache_threshold": 500,
-      "ttl_config": {
-        "bootstrap": "86400s (24h)",
-        "league": "3600s (60min)",
-        "gw_data": "900s (15min)",
-        "api_default": "300s (5min)"
-      }
-    }
-  }
-  ```
-
-## Development
-
-### CSS Architecture
-- `variables.css` - Design tokens (colors, spacing, typography)
-- `base.css` - Reset and base styles
-- `components.css` - Reusable UI components
-- `layout.css` - Layout system (navbar, sidebar, grid)
-- `animations.css` - Animations and transitions
-- `pages.css` - Page-specific styles
-
-### JavaScript Modules
-- `main.js` - Core app logic
-- `components.js` - DataTable component
-- `filters.js` - Filter validation
-- `tables.js` - Table utilities
-
-## Credits
-
-- Original Streamlit version by the FPL community
-- Flask migration with modern UI redesign
-
-## License
-
-MIT
