@@ -94,8 +94,8 @@ DEFAULT_MONTH_MAPPING = _env_str(
 )
 
 # Prize Money Settings (VND)
-WEEKLY_PRIZE = _env_int("WEEKLY_PRIZE", 300000)
-MONTHLY_PRIZE = _env_int("MONTHLY_PRIZE", 500000)
+WEEKLY_PRIZE = _env_int("WEEKLY_PRIZE", 200000)
+MONTHLY_PRIZE = _env_int("MONTHLY_PRIZE", 400000)
 
 # UI Settings
 PAGE_TITLE = _env_str("PAGE_TITLE", "RSC Fantasy League")
